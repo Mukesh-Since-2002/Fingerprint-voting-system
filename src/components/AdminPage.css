@@ -1,0 +1,47 @@
+/* AdminPage.css */
+.admin-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(to right, #6a11cb, #2575fc);
+  color: white;
+  text-align: center;
+  font-family: 'Segoe UI', sans-serif;
+  padding: 20px;
+}
+
+.admin-container h2 {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.admin-container p {
+  font-size: 18px;
+  margin-bottom: 30px;
+}
+
+.add-candidate-btn {
+  background-color: white;
+  color: #2575fc;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.add-candidate-btn:hover {
+  background-color: #e3e3e3;
+}
+
+.admin-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 20px;
+  font-weight: bold;
+}

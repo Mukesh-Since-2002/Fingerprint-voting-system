@@ -1,0 +1,77 @@
+/* VotingPage.css */
+
+.voting-container {
+  min-height: 100vh;
+  background: linear-gradient(to right, #4a00e0, #007bff);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 50px 20px;
+}
+
+.voting-title {
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 30px;
+}
+
+.candidate-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 30px;
+  max-width: 1000px;
+  width: 100%;
+}
+
+.candidate-card {
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  width: 220px;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  transition: transform 0.3s ease;
+}
+
+.candidate-card:hover {
+  transform: translateY(-5px);
+}
+
+.candidate-card img {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  border-radius: 50%;
+  background-color: #fff;
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 10px;
+}
+
+.candidate-card h3 {
+  margin: 10px 0 5px;
+  font-weight: 600;
+}
+
+.candidate-card p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #444;
+}
+
+.vote-btn {
+  background-color: #007bff;
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.vote-btn:hover {
+  background-color: #0056b3;
+}
