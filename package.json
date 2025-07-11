@@ -3,11 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@simplewebauthn/browser": "^13.1.2",
+    "@simplewebauthn/server": "^13.1.2",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.10.0",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
     "firebase": "^11.10.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -19,7 +24,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "start-server": "node src/routes/server.js"
   },
   "eslintConfig": {
     "extends": [

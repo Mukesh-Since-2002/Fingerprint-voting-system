@@ -54,7 +54,31 @@
 }
 
 .login-form .error {
-  color: red;
+  color: #e53935;
+  font-weight: bold;
   margin-top: 10px;
   font-size: 14px;
+}
+
+.login-form .success {
+  color: #43a047;
+  font-weight: bold;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.login-form p {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #333;
+}
+
+.login-form a {
+  color: #2575fc;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.login-form a:hover {
+  text-decoration: underline;
 }

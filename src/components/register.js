@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
-  reload,
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -20,6 +19,7 @@ const Register = () => {
   const [showLoginLink, setShowLoginLink] = useState(false);
   const navigate = useNavigate();
 
+  // ✅ Email/Password Registration
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
@@ -60,15 +60,89 @@ const Register = () => {
     }
   };
 
+  // ✅ Check Email Verification
   const checkEmailVerified = async () => {
-    if (user) {
-      await reload(user);
-      if (user.emailVerified) {
-        setIsVerified(true);
-      } else {
-        setError('Email not verified yet. Please check your inbox.');
+    try {
+      if (auth.currentUser) {
+        await auth.currentUser.reload();
+        if (auth.currentUser.emailVerified) {
+          setIsVerified(true);
+          setSuccess('Email successfully verified! You can now register fingerprint or log in.');
+        } else {
+          setError('Email not verified yet. Please check your inbox.');
+        }
       }
+    } catch (err) {
+      setError('Error checking verification: ' + err.message);
     }
+  };
+
+  // ✅ Fingerprint Registration
+  const registerFingerprint = async () => {
+    setError('');
+    setSuccess('');
+
+    try {
+      const res = await fetch('/generate-registration-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const options = await res.json();
+
+      options.challenge = base64urlToBuffer(options.challenge);
+      options.user.id = base64urlToBuffer(options.user.id);
+
+      if (options.excludeCredentials) {
+        options.excludeCredentials = options.excludeCredentials.map((cred) => ({
+          ...cred,
+          id: base64urlToBuffer(cred.id),
+        }));
+      }
+
+      const credential = await navigator.credentials.create({ publicKey: options });
+
+      const registrationResponse = {
+        id: credential.id,
+        rawId: bufferToBase64Url(credential.rawId),
+        type: credential.type,
+        response: {
+          attestationObject: bufferToBase64Url(credential.response.attestationObject),
+          clientDataJSON: bufferToBase64Url(credential.response.clientDataJSON),
+        },
+      };
+
+      const verificationRes = await fetch('/verify-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registrationResponse),
+      });
+
+      const verificationData = await verificationRes.json();
+
+      if (verificationData.verified) {
+        setSuccess('✅ Fingerprint registered successfully!');
+      } else {
+        setError('❌ Fingerprint verification failed.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('❌ Fingerprint registration error.');
+    }
+  };
+
+  // 🔁 Buffer <-> Base64URL converters
+  const bufferToBase64Url = (buffer) =>
+    btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+
+  const base64urlToBuffer = (base64url) => {
+    const padding = '='.repeat((4 - (base64url.length % 4)) % 4);
+    const base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return new Uint8Array([...rawData].map((char) => char.charCodeAt(0))).buffer;
   };
 
   return (
@@ -125,41 +199,31 @@ const Register = () => {
         {user && !isVerified && (
           <button
             type="button"
+            className="btn-warning"
             onClick={checkEmailVerified}
-            style={{
-              marginTop: '10px',
-              backgroundColor: '#ffa500',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '10px',
-              cursor: 'pointer',
-              width: '100%',
-              fontWeight: 'bold'
-            }}
           >
             Check Email Verified
           </button>
         )}
 
         {isVerified && (
-          <button
-            type="button"
-            onClick={() => navigate('/login')}
-            style={{
-              marginTop: '10px',
-              backgroundColor: '#4caf50',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '10px',
-              cursor: 'pointer',
-              width: '100%',
-              fontWeight: 'bold'
-            }}
-          >
-            Go to Login
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={registerFingerprint}
+            >
+              Register with Fingerprint (Passkey)
+            </button>
+
+            <button
+              type="button"
+              className="btn-success"
+              onClick={() => navigate('/login')}
+            >
+              Go to Login
+            </button>
+          </>
         )}
 
         {showLoginLink && (

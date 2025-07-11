@@ -48,7 +48,7 @@
   background-color: #1a5ed9;
 }
 
-/* Add this below your existing CSS */
+/* Role selection cards */
 .role-cards {
   display: flex;
   justify-content: space-between;
@@ -82,5 +82,66 @@
   border-color: #2575fc;
   background-color: #e3f0ff;
   box-shadow: 0 0 10px rgba(37, 117, 252, 0.4);
+  font-weight: bold;
+}
+
+/* Alert messages */
+.error {
+  color: #e53935;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.success {
+  color: #43a047;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+/* Additional custom buttons */
+.btn-warning,
+.btn-primary,
+.btn-success {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.btn-warning {
+  background-color: #ffa500;
+  color: #fff;
+}
+
+.btn-warning:hover {
+  background-color: #e59400;
+}
+
+.btn-primary {
+  background-color: #2575fc;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: #1a5ed9;
+}
+
+.btn-success {
+  background-color: #28a745;
+  color: #fff;
+}
+
+.btn-success:hover {
+  background-color: #1e7e34;
+}
+
+/* Login link */
+.register-form a {
+  color: #ffffff;
+  text-decoration: underline;
   font-weight: bold;
 }
