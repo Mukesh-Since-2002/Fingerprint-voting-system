@@ -6,6 +6,8 @@ const webauthRoutes = require('./webauth'); // WebAuthn logic in this file
 
 const app = express();
 
+require('dotenv').config();
+
 // ✅ Use Railway-provided PORT or default to 5000 for local dev
 const PORT = process.env.PORT || 5000;
 
