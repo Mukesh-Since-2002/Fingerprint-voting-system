@@ -6,9 +6,10 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^5.1.0",
+    "@simplewebauthn/server": "^13.1.2",
     "cors": "^2.8.5",
-    "@simplewebauthn/server": "^13.1.2"
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0"
   },
   "engines": {
     "node": "18"
