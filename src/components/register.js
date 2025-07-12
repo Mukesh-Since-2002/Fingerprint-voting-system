@@ -8,6 +8,9 @@ import { doc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import './Register.css';
 
+// ✅ Backend API endpoint (must match the routes in your Express server)
+const BACKEND_URL = 'https://fingerprint-voting-system-production.up.railway.app/api';
+
 const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +22,6 @@ const Register = () => {
   const [showLoginLink, setShowLoginLink] = useState(false);
   const navigate = useNavigate();
 
-  // ✅ Email/Password Registration
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
@@ -40,7 +42,7 @@ const Register = () => {
       await setDoc(doc(db, 'users', newUser.uid), {
         email,
         role,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       });
 
       setUser(newUser);
@@ -60,7 +62,6 @@ const Register = () => {
     }
   };
 
-  // ✅ Check Email Verification
   const checkEmailVerified = async () => {
     try {
       if (auth.currentUser) {
@@ -77,16 +78,21 @@ const Register = () => {
     }
   };
 
-  // ✅ Fingerprint Registration
   const registerFingerprint = async () => {
     setError('');
     setSuccess('');
 
     try {
-      const res = await fetch('/generate-registration-options', {
+      const res = await fetch(`${BACKEND_URL}/generate-registration-options`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          uid: user.uid,
+        }),
       });
+
+      if (!res.ok) throw new Error('Failed to fetch registration options');
 
       const options = await res.json();
 
@@ -112,7 +118,7 @@ const Register = () => {
         },
       };
 
-      const verificationRes = await fetch('/verify-registration', {
+      const verificationRes = await fetch(`${BACKEND_URL}/verify-registration`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registrationResponse),
@@ -127,11 +133,10 @@ const Register = () => {
       }
     } catch (err) {
       console.error(err);
-      setError('❌ Fingerprint registration error.');
+      setError('❌ Fingerprint registration error: ' + err.message);
     }
   };
 
-  // 🔁 Buffer <-> Base64URL converters
   const bufferToBase64Url = (buffer) =>
     btoa(String.fromCharCode(...new Uint8Array(buffer)))
       .replace(/\+/g, '-')
@@ -197,30 +202,17 @@ const Register = () => {
         <button type="submit">Register</button>
 
         {user && !isVerified && (
-          <button
-            type="button"
-            className="btn-warning"
-            onClick={checkEmailVerified}
-          >
+          <button type="button" className="btn-warning" onClick={checkEmailVerified}>
             Check Email Verified
           </button>
         )}
 
         {isVerified && (
           <>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={registerFingerprint}
-            >
+            <button type="button" className="btn-primary" onClick={registerFingerprint}>
               Register with Fingerprint (Passkey)
             </button>
-
-            <button
-              type="button"
-              className="btn-success"
-              onClick={() => navigate('/login')}
-            >
+            <button type="button" className="btn-success" onClick={() => navigate('/login')}>
               Go to Login
             </button>
           </>
