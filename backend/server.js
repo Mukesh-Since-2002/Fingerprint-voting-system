@@ -1,31 +1,25 @@
-// server.js
-
 const express = require('express');
 const cors = require('cors');
-const webauthRoutes = require('./webauth'); // WebAuthn logic in this file
+const webauthRoutes = require('./webauth');
 
 const app = express();
 
-require('dotenv').config();
-
-// ✅ Use Railway-provided PORT or default to 5000 for local dev
+// ✅ Use Railway-provided PORT or fallback to 5000 for local testing
 const PORT = process.env.PORT || 5000;
 
 // ✅ Middleware
 app.use(cors());
-app.use(express.json()); // Instead of body-parser (built-in in Express v4.16+)
+app.use(express.json());
 
-// ✅ API Routes
+// ✅ WebAuthn API Routes
 app.use('/api', webauthRoutes);
 
-// ✅ Root route to test deployment
+// ✅ Root Route
 app.get('/', (req, res) => {
   res.send('✅ Fingerprint Voting System Backend is Running');
 });
 
-// ✅ Start server
+// ✅ Start Server
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
-
-module.exports = app;

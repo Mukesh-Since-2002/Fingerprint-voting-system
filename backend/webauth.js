@@ -1,5 +1,3 @@
-// webauth.js
-
 const express = require('express');
 const {
   generateRegistrationOptions,
@@ -10,17 +8,15 @@ const {
 
 const router = express.Router();
 
-// Mock DB (replace with real DB in production)
-let mockDB = {};
-
-// RP configuration (Railway domain)
+// Constants for your deployed domain
 const rpName = 'Fingerprint Voting System';
 const expectedOrigin = 'https://fingerprint-voting-system-production.up.railway.app';
 const expectedRPID = 'fingerprint-voting-system-production.up.railway.app';
 
-/**
- * 🔐 Generate WebAuthn Registration Options
- */
+let latestChallenge = '';
+let storedCredential = null;
+
+// ✅ Generate Registration Options
 router.post('/generate-registration-options', (req, res) => {
   const { email, uid } = req.body;
 
@@ -28,66 +24,36 @@ router.post('/generate-registration-options', (req, res) => {
     return res.status(400).json({ error: 'Missing email or uid' });
   }
 
-  const user = {
-    id: uid,
-    name: email,
-    displayName: email.split('@')[0],
-  };
-
   const options = generateRegistrationOptions({
     rpName,
     rpID: expectedRPID,
-    userID: user.id,
-    userName: user.name,
+    userID: uid,
+    userName: email,
     timeout: 60000,
     attestationType: 'none',
     authenticatorSelection: {
       userVerification: 'preferred',
       authenticatorAttachment: 'platform',
     },
-    excludeCredentials: mockDB[uid]?.devices?.map((cred) => ({
-      id: cred.credentialID,
-      type: 'public-key',
-      transports: ['internal'],
-    })) || [],
   });
 
-  mockDB[uid] = {
-    challenge: options.challenge,
-    user,
-  };
-
+  latestChallenge = options.challenge;
   res.json(options);
 });
 
-/**
- * ✅ Verify Registration Response
- */
+// ✅ Verify Registration Response
 router.post('/verify-registration', async (req, res) => {
-  const response = req.body;
-
-  const uid = response?.response?.userHandle;
-
-  if (!uid || !mockDB[uid]?.challenge) {
-    return res.status(400).json({ error: 'User data not found for verification' });
-  }
-
   try {
     const verification = await verifyRegistrationResponse({
-      response,
-      expectedChallenge: mockDB[uid].challenge,
+      response: req.body,
+      expectedChallenge: latestChallenge,
       expectedOrigin,
       expectedRPID,
     });
 
     if (verification.verified) {
-      const { credentialPublicKey, credentialID, counter } = verification.registrationInfo;
-
-      mockDB[uid].credential = {
-        credentialID,
-        credentialPublicKey,
-        counter,
-      };
+      const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+      storedCredential = { credentialID, credentialPublicKey, counter };
     }
 
     res.json({ verified: verification.verified });
@@ -97,15 +63,10 @@ router.post('/verify-registration', async (req, res) => {
   }
 });
 
-/**
- * 🔓 Generate Authentication Options
- */
+// ✅ Generate Authentication Options
 router.post('/generate-authentication-options', (req, res) => {
-  const { uid } = req.body;
-
-  const userData = mockDB[uid];
-  if (!userData?.credential) {
-    return res.status(400).json({ error: 'No registered credentials found' });
+  if (!storedCredential) {
+    return res.status(400).json({ error: 'No credential registered yet.' });
   }
 
   const options = generateAuthenticationOptions({
@@ -113,7 +74,7 @@ router.post('/generate-authentication-options', (req, res) => {
     rpID: expectedRPID,
     allowCredentials: [
       {
-        id: userData.credential.credentialID,
+        id: storedCredential.credentialID,
         type: 'public-key',
         transports: ['internal'],
       },
@@ -121,36 +82,27 @@ router.post('/generate-authentication-options', (req, res) => {
     userVerification: 'preferred',
   });
 
-  mockDB[uid].challenge = options.challenge;
-
+  latestChallenge = options.challenge;
   res.json(options);
 });
 
-/**
- * ✅ Verify Authentication Response
- */
+// ✅ Verify Authentication Response
 router.post('/verify-authentication', async (req, res) => {
-  const response = req.body;
-  const uid = response?.response?.userHandle;
-
-  const userData = mockDB[uid];
-
-  if (!userData || !userData.credential) {
-    return res.status(400).json({ error: 'User or credential not found' });
+  if (!storedCredential) {
+    return res.status(400).json({ error: 'No credential stored.' });
   }
 
   try {
     const verification = await verifyAuthenticationResponse({
-      response,
-      expectedChallenge: userData.challenge,
+      response: req.body,
+      expectedChallenge: latestChallenge,
       expectedOrigin,
       expectedRPID,
-      authenticator: userData.credential,
+      authenticator: storedCredential,
     });
 
     if (verification.verified) {
-      // Update counter to prevent replay attacks
-      userData.credential.counter = verification.authenticationInfo.newCounter;
+      storedCredential.counter = verification.authenticationInfo.newCounter;
     }
 
     res.json({ verified: verification.verified });
