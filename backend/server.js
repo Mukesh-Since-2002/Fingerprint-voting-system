@@ -1,51 +1,62 @@
 const express = require('express');
 const cors = require('cors');
-const webauthRoutes = require('./webauth'); // Assuming webauth.js is in the same directory
+const webauthRoutes = require('./webauth'); // Make sure webauth.js exists
 
 const app = express();
 
-// Use Railway-provided PORT. Fallback to 5000 for *local development only*.
+// Use Railway-provided PORT or fallback to 5000
 const PORT = process.env.PORT || 5000;
 
-const allowedOrigins = process.env.FRONTEND_ORIGIN ? process.env.FRONTEND_ORIGIN.split(',') : [];
+// Load environment variables directly
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || '';
+const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN;
+const WEBAUTHN_RPID = process.env.WEBAUTHN_RPID;
 
-const corsOptions = {
-  origin: function (origin, callback) {
+// Log loaded vars
+console.log('🔧 Loaded Environment Variables:', {
+  FRONTEND_ORIGIN,
+  WEBAUTHN_ORIGIN,
+  WEBAUTHN_RPID,
+});
 
-    console.log('🟢 CORS origin received:', origin);
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+// Warn if required vars are missing
+if (!WEBAUTHN_ORIGIN || !WEBAUTHN_RPID) {
+  console.error('❌ ERROR: WEBAUTHN_ORIGIN and WEBAUTHN_RPID must be set for WebAuthn to function!');
+}
 
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+// Split comma-separated origins
+const allowedOrigins = FRONTEND_ORIGIN.split(',');
+
+// CORS setup
+app.use(cors({
+  origin: (origin, callback) => {
+    console.log('🟢 Incoming request from:', origin);
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('❌ Not allowed by CORS'));
     }
   },
-  methods: ['GET', 'POST'], // Specify allowed HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
-  credentials: true // Allow cookies, authorization headers to be sent
-};
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
 
-app.use(cors(corsOptions));
 app.use(express.json());
 
-// WebAuthn API Routes
+// Routes
 app.use('/api', webauthRoutes);
 
-// Root Route
 app.get('/', (req, res) => {
   res.send('✅ Fingerprint Voting System Backend is Running');
 });
 
-// Start Server
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`Backend URL: http://localhost:${PORT}`);
-  if (process.env.WEBAUTHN_ORIGIN) {
-    console.log(`Expected WebAuthn Origin: ${process.env.WEBAUTHN_ORIGIN}`);
-    console.log(`Expected WebAuthn RP ID: ${process.env.WEBAUTHN_RPID}`);
-  } else {
-    console.warn("⚠️ WEBAUTHN_ORIGIN and WEBAUTHN_RPID environment variables are not set. WebAuthn might not work correctly.");
+  console.log(`🌐 Backend URL: http://localhost:${PORT}`);
+  if (WEBAUTHN_ORIGIN) {
+    console.log(`🔐 Expected WebAuthn Origin: ${WEBAUTHN_ORIGIN}`);
+    console.log(`🔐 Expected WebAuthn RP ID: ${WEBAUTHN_RPID}`);
   }
 });
