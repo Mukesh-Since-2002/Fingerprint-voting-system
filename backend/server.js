@@ -11,6 +11,8 @@ const allowedOrigins = process.env.FRONTEND_ORIGIN ? process.env.FRONTEND_ORIGIN
 
 const corsOptions = {
   origin: function (origin, callback) {
+
+    console.log('🟢 CORS origin received:', origin);
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 

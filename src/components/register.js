@@ -227,5 +227,5 @@ const Register = () => {
     </div>
   );
 };
-
+git
 export default Register;
