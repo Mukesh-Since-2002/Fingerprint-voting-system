@@ -1,31 +1,30 @@
 const express = require('express');
 const cors = require('cors');
-const webauthRoutes = require('./webauth'); // Make sure webauth.js exists
+const webauthRoutes = require('./webauth'); // Ensure this file exists and exports a router
 
 const app = express();
-
-// Use Railway-provided PORT or fallback to 5000
 const PORT = process.env.PORT || 5000;
 
-// Load environment variables directly
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || '';
-const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN;
-const WEBAUTHN_RPID = process.env.WEBAUTHN_RPID;
+// Load required environment variables
+const FRONTEND_ORIGIN = 'https://fingerprint-voting-syste-7687a.web.app';
+const origin = 'https://ravishing-playfulness-production.up.railway.app';
+const rpID = 'ravishing-playfulness-production.up.railway.app';
 
-// Log loaded vars
+
 console.log('🔧 Loaded Environment Variables:', {
   FRONTEND_ORIGIN,
   WEBAUTHN_ORIGIN,
   WEBAUTHN_RPID,
 });
 
-// Warn if required vars are missing
+// Fail early if env variables are not set
 if (!WEBAUTHN_ORIGIN || !WEBAUTHN_RPID) {
-  console.error('❌ ERROR: WEBAUTHN_ORIGIN and WEBAUTHN_RPID must be set for WebAuthn to function!');
+  console.error('❌ ERROR: WEBAUTHN_ORIGIN and WEBAUTHN_RPID must be defined!');
+  process.exit(1); // Stop server if critical envs are missing
 }
 
-// Split comma-separated origins
-const allowedOrigins = FRONTEND_ORIGIN.split(',');
+// Prepare allowed origins
+const allowedOrigins = FRONTEND_ORIGIN.split(',').map(origin => origin.trim());
 
 // CORS setup
 app.use(cors({
@@ -34,7 +33,8 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
       callback(null, true);
     } else {
-      callback(new Error('❌ Not allowed by CORS'));
+      console.error('❌ CORS Rejected:', origin);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   methods: ['GET', 'POST'],
@@ -42,21 +42,26 @@ app.use(cors({
   credentials: true,
 }));
 
+// Middleware
 app.use(express.json());
 
-// Routes
+// API routes
 app.use('/api', webauthRoutes);
 
+// Root route
 app.get('/', (req, res) => {
   res.send('✅ Fingerprint Voting System Backend is Running');
 });
 
-// Start server
+// Global error handling (optional but recommended)
+app.use((err, req, res, next) => {
+  console.error('🔥 Uncaught Error:', err.stack);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
+// Start the server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Backend URL: http://localhost:${PORT}`);
-  if (WEBAUTHN_ORIGIN) {
-    console.log(`🔐 Expected WebAuthn Origin: ${WEBAUTHN_ORIGIN}`);
-    console.log(`🔐 Expected WebAuthn RP ID: ${WEBAUTHN_RPID}`);
-  }
+  console.log(`🚀 Server is live at: http://localhost:${PORT}`);
+  console.log(`🌐 WebAuthn Origin: ${WEBAUTHN_ORIGIN}`);
+  console.log(`🌐 WebAuthn RP ID: ${WEBAUTHN_RPID}`);
 });

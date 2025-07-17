@@ -8,78 +8,59 @@ const {
 
 const router = express.Router();
 
-const rpName = 'Fingerprint Voting System'; // Your app's display name
-const expectedOrigin = process.env.WEBAUTHN_ORIGIN; // The exact URL of your deployed backend (e.g., https://your-backend-xxxx.up.railway.app)
-const expectedRPID = process.env.WEBAUTHN_RPID;     // The domain of your deployed backend (e.g., your-backend-xxxx.up.railway.app)
+// Config values from Railway environment (set in Railway Dashboard)
+const rpName = 'Fingerprint Voting System';
+const expectedOrigin = process.env.WEBAUTHN_ORIGIN;
+const expectedRPID = process.env.WEBAUTHN_RPID;
 
+// In-memory stores (for dev/demo)
+const users = new Map();       // userId -> { credentials: [] }
+const challenges = new Map();  // userId -> challenge string
 
-const mockDb = {
-  users: new Map(), // Stores user data including credentials
-  challenges: new Map() // Stores challenges per user ID/session ID temporarily
-};
-
-// Helper function to simulate saving/retrieving data from DB
-const saveUserCredential = (userId, credentialInfo) => {
-  const user = mockDb.users.get(userId) || { credentials: [] };
-  // In a real DB, you'd update or add this credential for the user
-  user.credentials.push(credentialInfo);
-  mockDb.users.set(userId, user);
-  console.log(`[MOCK_DB] Saved credential for user ${userId}`);
-};
-
-const getUserCredential = (userId, credentialId) => {
-  const user = mockDb.users.get(userId);
-  if (user && user.credentials) {
-    return user.credentials.find(cred => cred.credentialID === credentialId);
-  }
-  return null;
-};
-
-const updateCredentialCounter = (userId, credentialId, newCounter) => {
-  const user = mockDb.users.get(userId);
-  if (user && user.credentials) {
-    const credential = user.credentials.find(cred => cred.credentialID === credentialId);
-    if (credential) {
-      credential.counter = newCounter;
-      console.log(`[MOCK_DB] Updated counter for credential ${credentialId} to ${newCounter}`);
-    }
-  }
-};
-
-const saveChallenge = (userId, challenge) => {
-    // In a real DB, this might be stored with an expiry
-    mockDb.challenges.set(userId, challenge);
-    console.log(`[MOCK_DB] Saved challenge for user ${userId}`);
-};
-
-const getChallenge = (userId) => {
-    const challenge = mockDb.challenges.get(userId);
-    // In a real DB, you'd also delete it after retrieval to prevent replay attacks
-    mockDb.challenges.delete(userId); // Consume the challenge
-    console.log(`[MOCK_DB] Retrieved and consumed challenge for user ${userId}`);
-    return challenge;
-};
-// --- END CONCEPTUAL MOCK DATABASE ---
-
-// Check if critical environment variables are set on server startup
+// Validate critical env vars
 if (!expectedOrigin || !expectedRPID) {
-  console.error("❌ ERROR: WEBAUTHN_ORIGIN and WEBAUTHN_RPID environment variables must be set for WebAuthn to function!");
-  console.error("Please configure them in your Railway project's 'Variables' tab.");
-
+  console.error('❌ Missing WEBAUTHN_ORIGIN or WEBAUTHN_RPID env variables.');
+  process.exit(1);
 }
 
-// ✅ Generate Registration Options
+// Utility functions
+const saveChallenge = (userId, challenge) => challenges.set(userId, challenge);
+const getChallenge = (userId) => {
+  const challenge = challenges.get(userId);
+  challenges.delete(userId);
+  return challenge;
+};
+
+const saveCredential = (userId, credential) => {
+  const user = users.get(userId) || { credentials: [] };
+  user.credentials.push(credential);
+  users.set(userId, user);
+};
+
+const getCredential = (userId, credentialId) => {
+  const user = users.get(userId);
+  return user?.credentials.find(c => c.credentialID === credentialId) || null;
+};
+
+const updateCounter = (userId, credentialId, newCounter) => {
+  const user = users.get(userId);
+  if (!user) return;
+  const credential = user.credentials.find(c => c.credentialID === credentialId);
+  if (credential) credential.counter = newCounter;
+};
+
+// 1️⃣ Registration Options
 router.post('/generate-registration-options', async (req, res) => {
-  const { email, uid } = req.body; // Assuming uid is a unique user identifier
+  const { email, uid } = req.body;
 
   if (!email || !uid) {
     return res.status(400).json({ error: 'Missing email or uid' });
   }
 
-  // In a real app, you'd fetch any existing credentials for this uid from your DB
-  // to prevent re-registration of the same authenticator.
-  const existingCredentials = (mockDb.users.get(uid)?.credentials || []).map(cred => ({
-    id: Buffer.from(cred.credentialID, 'base64url'), // Convert to Buffer
+  const userCreds = users.get(uid)?.credentials || [];
+
+  const excludeCredentials = userCreds.map(cred => ({
+    id: Buffer.from(cred.credentialID, 'base64url'),
     type: 'public-key',
   }));
 
@@ -87,93 +68,80 @@ router.post('/generate-registration-options', async (req, res) => {
     const options = await generateRegistrationOptions({
       rpName,
       rpID: expectedRPID,
-      userID: uid, // User's unique ID
-      userName: email, // User's display name (can be email)
+      userID: uid,
+      userName: email,
       timeout: 60000,
       attestationType: 'none',
       authenticatorSelection: {
         userVerification: 'preferred',
-        authenticatorAttachment: 'platform', // Or 'cross-platform' for USB/NFC keys
+        authenticatorAttachment: 'platform',
       },
-      excludeCredentials: existingCredentials, // Prevent re-registration of existing keys
+      excludeCredentials,
     });
 
-    // Store the challenge associated with the user/session ID in your database.
-    // This challenge MUST be unique for each registration attempt and consumed after use.
-    saveChallenge(uid, options.challenge); // Using mockDb
-
+    saveChallenge(uid, options.challenge);
     res.json(options);
-  } catch (error) {
-    console.error('❌ Error generating registration options:', error);
+  } catch (err) {
+    console.error('❌ Failed to generate registration options:', err);
     res.status(500).json({ error: 'Failed to generate registration options' });
   }
 });
 
-// ✅ Verify Registration Response
+// 2️⃣ Verify Registration Response
 router.post('/verify-registration', async (req, res) => {
-  const { uid, response } = req.body; // Assuming uid is sent with the response
+  const { uid, response } = req.body;
 
   if (!uid || !response) {
     return res.status(400).json({ error: 'Missing user ID or response' });
   }
 
-  // Retrieve the challenge from your database (associated with this uid/session)
-  const expectedChallenge = getChallenge(uid); // Using mockDb
-
+  const expectedChallenge = getChallenge(uid);
   if (!expectedChallenge) {
-    return res.status(400).json({ error: 'No active challenge found or challenge expired/reused.' });
+    return res.status(400).json({ error: 'Challenge missing or expired' });
   }
 
   try {
     const verification = await verifyRegistrationResponse({
-      response: req.body,
+      response,
       expectedChallenge,
       expectedOrigin,
       expectedRPID,
     });
 
-    if (verification.verified) {
-      const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
-
-      // Store the new credential information persistently in your database,
-      // linked to the user (uid).
-      saveUserCredential(uid, {
-        credentialID: credentialID,
-        credentialPublicKey: credentialPublicKey,
-        counter: counter,
-        // Also store these if you want to verify against specific authenticator data later
-        // authenticator: verification.registrationInfo.authenticator
-      }); // Using mockDb
-
-      res.json({ verified: true });
-    } else {
-      res.status(400).json({ verified: false, error: 'Registration verification failed.' });
+    if (!verification.verified) {
+      return res.status(400).json({ verified: false, error: 'Verification failed' });
     }
+
+    const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+    saveCredential(uid, {
+      credentialID,
+      credentialPublicKey,
+      counter,
+    });
+
+    res.json({ verified: true });
   } catch (err) {
-    console.error('❌ Registration verification failed:', err);
-    res.status(400).json({ verified: false, error: err.message });
+    console.error('❌ Registration verification error:', err);
+    res.status(500).json({ verified: false, error: err.message });
   }
 });
 
-// ✅ Generate Authentication Options
+// 3️⃣ Authentication Options
 router.post('/generate-authentication-options', async (req, res) => {
-  const { uid } = req.body; // Assuming you identify the user somehow before authentication
+  const { uid } = req.body;
 
   if (!uid) {
-    return res.status(400).json({ error: 'Missing user ID' });
+    return res.status(400).json({ error: 'Missing uid' });
   }
 
-  // Retrieve all registered credentials for this user from your database
-  const user = mockDb.users.get(uid); // Using mockDb
-  if (!user || !user.credentials || user.credentials.length === 0) {
-    return res.status(400).json({ error: 'No credential registered for this user yet.' });
+  const user = users.get(uid);
+  if (!user || !user.credentials.length) {
+    return res.status(400).json({ error: 'No credentials found for user' });
   }
 
   const allowCredentials = user.credentials.map(cred => ({
-    id: Buffer.from(cred.credentialID, 'base64url'), // Convert to Buffer
+    id: Buffer.from(cred.credentialID, 'base64url'),
     type: 'public-key',
-    // Optionally include transports if you saved them during registration
-    // transports: cred.transports,
   }));
 
   try {
@@ -184,42 +152,37 @@ router.post('/generate-authentication-options', async (req, res) => {
       userVerification: 'preferred',
     });
 
-    // Store the challenge associated with the user/session ID in your database.
-    saveChallenge(uid, options.challenge); // Using mockDb
-
+    saveChallenge(uid, options.challenge);
     res.json(options);
-  } catch (error) {
-    console.error('❌ Error generating authentication options:', error);
+  } catch (err) {
+    console.error('❌ Failed to generate authentication options:', err);
     res.status(500).json({ error: 'Failed to generate authentication options' });
   }
 });
 
-// ✅ Verify Authentication Response
+// 4️⃣ Verify Authentication Response
 router.post('/verify-authentication', async (req, res) => {
   const { uid, response } = req.body;
 
   if (!uid || !response) {
-    return res.status(400).json({ error: 'Missing user ID or response' });
+    return res.status(400).json({ error: 'Missing uid or response' });
   }
 
-  // Retrieve the challenge from your database (associated with this uid/session)
-  const expectedChallenge = getChallenge(uid); // Using mockDb
-
+  const expectedChallenge = getChallenge(uid);
   if (!expectedChallenge) {
-    return res.status(400).json({ error: 'No active challenge found or challenge expired/reused.' });
+    return res.status(400).json({ error: 'Challenge missing or expired' });
   }
 
-  
-  const credentialIdBuffer = Buffer.from(response.rawId || response.id, 'base64url');
-  const storedCredential = getUserCredential(uid, credentialIdBuffer.toString('base64url')); // Using mockDb
+  const credentialId = Buffer.from(response.rawId || response.id, 'base64url').toString('base64url');
+  const storedCredential = getCredential(uid, credentialId);
 
   if (!storedCredential) {
-    return res.status(400).json({ error: 'No matching credential found for this user.' });
+    return res.status(400).json({ error: 'Credential not found' });
   }
 
   try {
     const verification = await verifyAuthenticationResponse({
-      response: req.body,
+      response,
       expectedChallenge,
       expectedOrigin,
       expectedRPID,
@@ -227,20 +190,18 @@ router.post('/verify-authentication', async (req, res) => {
         credentialID: storedCredential.credentialID,
         credentialPublicKey: storedCredential.credentialPublicKey,
         counter: storedCredential.counter,
-        // Add any other properties of the authenticator if stored and needed for verification
       },
     });
 
-    if (verification.verified) {
-      // Update the counter in your database for the authenticated credential
-      updateCredentialCounter(uid, storedCredential.credentialID, verification.authenticationInfo.newCounter); // Using mockDb
-      res.json({ verified: true });
-    } else {
-      res.status(400).json({ verified: false, error: 'Authentication verification failed.' });
+    if (!verification.verified) {
+      return res.status(400).json({ verified: false, error: 'Verification failed' });
     }
+
+    updateCounter(uid, storedCredential.credentialID, verification.authenticationInfo.newCounter);
+    res.json({ verified: true });
   } catch (err) {
-    console.error('❌ Authentication verification failed:', err);
-    res.status(400).json({ verified: false, error: err.message });
+    console.error('❌ Authentication verification error:', err);
+    res.status(500).json({ verified: false, error: err.message });
   }
 });
 
