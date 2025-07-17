@@ -8,11 +8,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Load environment variables directly
-const FRONTEND_ORIGIN = 'https://fingerprint-voting-syste-7687a.web.app';
-const WEBAUTHN_ORIGIN = 'https://ravishing-playfulness-production.up.railway.app';
-const WEBAUTHN_RPID = 'ravishing-playfulness-production.up.railway.app';
-
-
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || '';
+const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN;
+const WEBAUTHN_RPID = process.env.WEBAUTHN_RPID;
 
 // Log loaded vars
 console.log('🔧 Loaded Environment Variables:', {
