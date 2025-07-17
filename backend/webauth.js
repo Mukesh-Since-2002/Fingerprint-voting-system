@@ -111,14 +111,14 @@ router.post('/generate-registration-options', async (req, res) => {
 
 // ✅ Verify Registration Response
 router.post('/verify-registration', async (req, res) => {
-  const { uid, response } = req.body; // Assuming uid is sent with the response
+  const { uid, response } = req.body;
 
   if (!uid || !response) {
     return res.status(400).json({ error: 'Missing user ID or response' });
   }
 
-  // Retrieve the challenge from your database (associated with this uid/session)
-  const expectedChallenge = getChallenge(uid); // Using mockDb
+  // Retrieve the expected challenge for this user
+  const expectedChallenge = getChallenge(uid); // Use your own db or mockDb
 
   if (!expectedChallenge) {
     return res.status(400).json({ error: 'No active challenge found or challenge expired/reused.' });
@@ -126,34 +126,33 @@ router.post('/verify-registration', async (req, res) => {
 
   try {
     const verification = await verifyRegistrationResponse({
-      response: req.body,
+      response: response,
       expectedChallenge,
-      expectedOrigin,
-      expectedRPID,
+      expectedOrigin: 'https://ravishing-playfulness-production.up.railway.app', // Replace with your backend URL
+      expectedRPID: 'ravishing-playfulness-production.up.railway.app', // Must match RPID used during registration
     });
 
     if (verification.verified) {
       const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
 
-      // Store the new credential information persistently in your database,
-      // linked to the user (uid).
+      // Save credential info for the user
       saveUserCredential(uid, {
-        credentialID: credentialID,
-        credentialPublicKey: credentialPublicKey,
-        counter: counter,
-        // Also store these if you want to verify against specific authenticator data later
-        // authenticator: verification.registrationInfo.authenticator
-      }); // Using mockDb
+        credentialID,
+        credentialPublicKey,
+        counter,
+      });
 
-      res.json({ verified: true });
+      return res.json({ verified: true });
     } else {
-      res.status(400).json({ verified: false, error: 'Registration verification failed.' });
+      return res.status(400).json({ verified: false, error: 'Registration verification failed.' });
     }
+
   } catch (err) {
     console.error('❌ Registration verification failed:', err);
-    res.status(400).json({ verified: false, error: err.message });
+    return res.status(400).json({ verified: false, error: err.message });
   }
 });
+
 
 // ✅ Generate Authentication Options
 router.post('/generate-authentication-options', async (req, res) => {
